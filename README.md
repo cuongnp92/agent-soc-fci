@@ -91,12 +91,6 @@ ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/
 ```
 SSH sẽ tự thử `publickey` trước; node nào chưa có key sẽ tự động fallback sang `password`. Cần cài `sshpass` cho kiểu này. Dùng khi đang trong giai đoạn **chuyển dần** từ password sang key cho 38 VM — sau khi toàn bộ node đã có key (`ansible vms -m ping` ra `pong` hết), nên dọn `ansible_ssh_pass` khỏi file, chuyển hẳn về Kiểu 2 cho an toàn và gọn hơn.
 
-## Cấu hình khác trước khi chạy
-
-1. Trong `install_agent.yml`, kiểm tra lại biến `service_name` (mặc định `velociraptor_client`) khớp đúng tên service agent thật đang dùng.
-2. Trong `scripts/agent-velociraptor.sh`, kiểm tra `DEB_URL` trỏ đúng file `.deb` trên GitHub, và 2 endpoint SIEM (`PRIVATE_HOST`/`PUBLIC_HOST`) đúng với hạ tầng thật.
-3. `ansible.cfg` không cần chỉnh gì thêm dù dùng password hay key — file này chỉ cấu hình hành vi chung (đường dẫn inventory, timeout, pipelining), tách biệt hoàn toàn khỏi cách xác thực từng host.
-
 ## Cách chạy playbook
 
 ### 1. Chạy thử trên 1-2 node trước khi apply toàn bộ
