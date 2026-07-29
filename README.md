@@ -6,15 +6,18 @@ hoặc **kết hợp cả hai** (mỗi VM một kiểu khác nhau) — cấu hì
 
 ## Cấu trúc thư mục
 
+Theo đúng thực tế trên GitHub (`agent-soc-fci/agents-velociraptor/ansible_deploy/`):
+
 ```
 ansible_deploy/
-├── ansible.cfg              # Config chung: inventory mặc định, tắt host key checking
-├── inventory.ini            # Danh sách node (IP + thông tin đăng nhập: password và/hoặc SSH key)
-├── install_agent.yml        # Playbook chính: kiểm tra, cài đặt, verify agent
-├── test_run.yml             # Playbook debug tối giản (dùng khi cần chẩn đoán lỗi)
+├── old/                      # (*) Backup/file cũ - xem ghi chú bên dưới
 ├── scripts/
-│   └── agent-velociraptor.sh  # Script cài đặt agent (tải .deb từ GitHub, dpkg -i, start service)
-└── README.md
+│   └── agent-velociraptor.sh   # Script cài đặt agent (tải .deb từ GitHub, dpkg -i, start service)
+├── ansible.cfg                # Config chung: inventory mặc định, tắt host key checking
+├── install_agent.yml          # Playbook chính: kiểm tra, cài đặt, verify agent
+├── inventory.ini              # Danh sách node (IP + thông tin đăng nhập: password và/hoặc SSH key)
+├── test_run.yml               # Playbook debug tối giản (dùng khi cần chẩn đoán lỗi)
+└── README.md                  # (**) File này - xem ghi chú bên dưới
 ```
 
 ## Yêu cầu môi trường (trên máy chạy Ansible - controller)
