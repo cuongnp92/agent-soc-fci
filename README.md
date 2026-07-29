@@ -17,7 +17,6 @@ ansible_deploy/
 ├── install_agent.yml          # Playbook chính: kiểm tra, cài đặt, verify agent
 ├── inventory.ini              # Danh sách node (IP + thông tin đăng nhập: password và/hoặc SSH key)
 ├── test_run.yml               # Playbook debug tối giản (dùng khi cần chẩn đoán lỗi)
-└── README.md                  # (**) File này - xem ghi chú bên dưới
 ```
 
 ## Yêu cầu môi trường (trên máy chạy Ansible - controller)
