@@ -1,0 +1,28 @@
+---
+# test_run.yml
+# Playbook TOI GIAN de chan doan - bo het logic already_installed/marker,
+# chi upload + chay script + in TOAN BO ket qua tho (register) ra man hinh.
+# Dung ten module NGAN (copy, shell, debug) thay vi FQCN de tuong thich
+# voi cac ban Ansible cu hon.
+#
+# Chay: ansible-playbook test_run.yml --limit vm04
+
+- name: Test chay script agent debug thuan
+  hosts: vms
+  gather_facts: false
+
+  tasks:
+    - name: Upload script
+      copy:
+        src: "./scripts/agent-velociraptor.sh"
+        dest: "/home/agent-velociraptor.sh"
+        mode: '0755'
+
+    - name: Chay script khong co when khong co logic phu
+      shell: /home/agent-velociraptor.sh
+      register: result
+      failed_when: false
+
+    - name: In toan bo ket qua tho
+      debug:
+        var: result

@@ -1,0 +1,163 @@
+---
+# install_agent.yml
+# Upload agent-velociraptor.sh lên các node, cấp quyền thực thi, chạy script,
+# và kiểm tra kết quả cài đặt.
+#
+# Cách chạy:
+#   ansible-playbook install_agent.yml
+#
+# Chạy song song nhiều node cùng lúc (mặc định Ansible forks=5), tăng tốc với:
+#   ansible-playbook install_agent.yml -f 20
+#
+# Chỉ chạy thử (không apply) một vài host để test trước:
+#   ansible-playbook install_agent.yml --limit vm01,vm02
+
+- name: Deploy & cài đặt agent trên các node
+  hosts: vms
+  gather_facts: false
+  serial: 10          # chạy cuốn chiếu theo lô 10 máy/lần, tránh quá tải mạng/hệ thống
+  any_errors_fatal: false
+
+  vars:
+    script_local_path: "./scripts/agent-velociraptor.sh"
+    script_remote_path: "/home/agent-velociraptor.sh"
+    service_name: "velociraptor_client"     # sửa lại đúng tên service của agent bạn cài
+    # marker file để đánh dấu đã cài xong, dùng khi agent không tạo service/systemd riêng
+    marker_file: "/home/.agent_installed"
+
+  tasks:
+
+    - name: Kiểm tra kết nối SSH tới node
+      ping:
+      register: ping_result
+
+    # ------------------------------------------------------------------
+    # LUỒNG KIỂM TRA: node đã cài agent chưa? (chạy trước khi copy/cài)
+    # ------------------------------------------------------------------
+    - name: Kiểm tra service agent đã tồn tại/active chưa (systemd)
+      systemd:
+        name: "{{ service_name }}"
+      register: pre_check_service
+      failed_when: false        # service chưa tồn tại vẫn không coi là lỗi playbook
+
+    - name: Kiểm tra marker file đánh dấu đã cài (phòng agent không dùng systemd)
+      stat:
+        path: "{{ marker_file }}"
+      register: pre_check_marker
+
+    - name: Xác định node đã được cài đặt agent hay chưa (chỉ tin vào service thật đang active)
+      set_fact:
+        already_installed: >-
+          {{ pre_check_service.status is defined and
+             pre_check_service.status.ActiveState is defined and
+             pre_check_service.status.ActiveState == 'active' }}
+
+    - name: Cảnh báo nếu marker file tồn tại nhưng service KHÔNG active (marker bị "stale")
+      debug:
+        msg: >-
+          {{ inventory_hostname }} ({{ ansible_host }}): CẢNH BÁO - marker file tồn tại
+          nhưng service không active. Sẽ cài lại (bỏ qua marker cũ).
+      when:
+        - pre_check_marker.stat.exists
+        - not already_installed
+
+    - name: Bỏ qua cài đặt - node đã có agent rồi
+      debug:
+        msg: "{{ inventory_hostname }} ({{ ansible_host }}): Agent đã được cài trước đó -> SKIP."
+      when: already_installed
+
+    # ------------------------------------------------------------------
+    # LUỒNG CÀI ĐẶT: chỉ chạy khi CHƯA cài (when: not already_installed)
+    # ------------------------------------------------------------------
+    - name: Upload script agent-velociraptor.sh lên /home
+      copy:
+        src: "{{ script_local_path }}"
+        dest: "{{ script_remote_path }}"
+        mode: '0755'          # cấp quyền thực thi luôn khi copy
+        owner: root
+        group: root
+      when: not already_installed
+
+    - name: Chạy script cài đặt agent
+      shell: "{{ script_remote_path }}"
+      register: install_result
+      # nếu script trả về khác 0 vẫn tiếp tục để mình còn log lại được,
+      # không làm dừng cả playbook giữa chừng
+      failed_when: false
+      changed_when: install_result.rc == 0
+      when: not already_installed
+
+    - name: In log output của script (stdout)
+      debug:
+        msg: "{{ install_result.stdout_lines | default(['(chưa chạy script - có thể do bị SKIP hoặc lỗi trước đó)']) }}"
+      when: not already_installed
+
+    - name: In log lỗi của script (nếu có)
+      debug:
+        var: install_result.stderr_lines
+      when:
+        - not already_installed
+        - install_result.stderr_lines is defined
+        - install_result.stderr_lines | length > 0
+
+    - name: Đánh dấu node cài đặt thất bại (rc != 0)
+      set_fact:
+        install_failed: true
+      when:
+        - not already_installed
+        - install_result.rc is defined
+        - install_result.rc != 0
+
+    - name: Tạo marker file đánh dấu đã cài xong (chỉ khi cài thành công)
+      file:
+        path: "{{ marker_file }}"
+        state: touch
+        mode: '0644'
+      when:
+        - not already_installed
+        - install_result.rc is defined
+        - install_result.rc == 0
+
+    # ------------------------------------------------------------------
+    # Kiểm tra kết quả cài đặt (luôn chạy, kể cả node bị SKIP, để xác nhận trạng thái hiện tại)
+    # ------------------------------------------------------------------
+    - name: Kiểm tra service agent đã chạy chưa (systemd)
+      systemd:
+        name: "{{ service_name }}"
+      register: service_status
+      failed_when: false
+
+    - name: Báo cáo trạng thái service
+      debug:
+        msg: >-
+          {{ inventory_hostname }} ({{ ansible_host }}):
+          service {{ 'ACTIVE' if service_status.status is defined and
+          service_status.status.ActiveState == 'active' else 'KHÔNG CHẠY / KHÔNG TÌM THẤY' }}
+
+    - name: Kiểm tra process agent đang chạy (bổ sung, phòng trường hợp không dùng systemd)
+      command:
+        argv:
+          - pgrep
+          - -f
+          - "{{ service_name }}"
+      register: process_check
+      changed_when: false
+      failed_when: false      # pgrep trả rc=1 khi không tìm thấy process -> không coi là lỗi
+      ignore_errors: true
+
+    - name: Báo cáo process
+      debug:
+        msg: >-
+          {{ inventory_hostname }}: process check ->
+          {{ 'FOUND (PID: ' + process_check.stdout + ')' if process_check.stdout != '' else 'NOT FOUND' }}
+
+
+- name: Tổng hợp báo cáo cuối cùng
+  hosts: vms
+  gather_facts: false
+  tasks:
+    - name: In kết quả tổng hợp cuối cùng
+      debug:
+        msg: >-
+          {{ inventory_hostname }} ({{ ansible_host }}) =>
+          {{ 'THẤT BẠI' if install_failed | default(false) else 'THÀNH CÔNG' }}
