@@ -20,11 +20,16 @@ ansible_deploy/
 ## Yêu cầu môi trường (trên máy chạy Ansible - controller)
 
 ```bash
-# Cài Ansible (nếu chưa có)
+# Cài pip (nếu chưa có)
 sudo apt update
-sudo apt install software-properties-common -y
-sudo add-apt-repository --yes --update ppa:ansible/ansible
-sudo apt install ansible -y
+sudo apt install python3-pip -y
+
+# Cài Ansible qua pip (bản mới nhất, khuyên dùng thay vì apt/PPA)
+python3 -m pip install --user ansible
+
+# Thêm vào PATH nếu chưa có
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
 
 # Cài sshpass (chỉ cần nếu có ÍT NHẤT 1 node dùng password để login)
 sudo apt install sshpass -y
@@ -32,8 +37,11 @@ sudo apt install sshpass -y
 
 Kiểm tra:
 ```bash
+which ansible
 ansible --version
 ```
+
+> Nâng cấp Ansible sau này chỉ cần chạy lại: `python3 -m pip install --upgrade --user ansible`
 
 ## Cấu hình `inventory.ini`
 
